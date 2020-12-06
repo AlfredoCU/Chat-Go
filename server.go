@@ -8,9 +8,16 @@ import (
 	"os"
 )
 
-var message list.List
-var client list.List
-var show = true
+const (
+	Type = "tcp"
+	Port = ":9999"
+)
+
+var (
+	message list.List
+	client list.List
+	show = true
+)
 
 type File struct {
 	BS []byte
@@ -19,17 +26,21 @@ type File struct {
 }
 
 func server() {
-	s, err := net.Listen("tcp", ":9999")
+	s, err := net.Listen(Type, Port)
+
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	for {
 		c, err := s.Accept()
+
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
+
 		go handleClient(c)
 	}
 }
@@ -37,13 +48,17 @@ func server() {
 func handleClient(c net.Conn) {
 	var op uint64
 	var err error
+
 	newClient(c)
+
 	for {
 		err = gob.NewDecoder(c).Decode(&op)
+
 		if err != nil {
-			//fmt.Println(err)
+			fmt.Println(err)
 			continue
 		}
+
 		if op == 1 {
 			receiveMessage(c)
 		} else if op == 2 {
@@ -60,9 +75,11 @@ func handleClient(c net.Conn) {
 func newClient(c net.Conn) {
 	var msg string
 	err := gob.NewDecoder(c).Decode(&msg)
+
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	client.PushBack(c)
 	msg = "Online: " + msg
 
@@ -91,16 +108,19 @@ func receiveMessage(c net.Conn) {
 
 func sendMessageToEveryone(msg string, c net.Conn) {
 	var op uint64 = 1
+
 	for e:=client.Front(); e != nil; e = e.Next() {
 		if e.Value.(net.Conn) != c {
 			err := gob.NewEncoder(e.Value.(net.Conn)).Encode(op)
 			if err != nil {
-				//fmt.Println(err)
+				fmt.Println(err)
 				continue
 			}
+
 			err = gob.NewEncoder(e.Value.(net.Conn)).Encode(msg)
+
 			if err != nil {
-				//fmt.Println(err)
+				fmt.Println(err)
 				continue
 			}
 		}
@@ -110,15 +130,19 @@ func sendMessageToEveryone(msg string, c net.Conn) {
 func receiveFile(c net.Conn) {
 	var f File
 	err := gob.NewDecoder(c).Decode(&f)
+
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	// Save File
 	file, err := os.Create(f.Name)
+
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	defer file.Close()
 	_, _ = file.Write(f.BS)
 
@@ -139,12 +163,14 @@ func sendFilesAll(c net.Conn, f File) {
 		if e.Value.(net.Conn) != c {
 			err := gob.NewEncoder(e.Value.(net.Conn)).Encode(op)
 			if err != nil {
-				//fmt.Println(err)
+				fmt.Println(err)
 				continue
 			}
+
 			err = gob.NewEncoder(e.Value.(net.Conn)).Encode(f)
+
 			if err != nil {
-				//fmt.Println(err)
+				fmt.Println(err)
 				continue
 			}
 		}
@@ -172,7 +198,9 @@ func backupMessage() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	defer file.Close()
+
 	for e:=message.Front(); e != nil; e = e.Next() {
 		_, _ = file.WriteString(e.Value.(string) + "\n")
 	}
@@ -188,6 +216,7 @@ func main() {
 		fmt.Println("0.- Exit")
 		fmt.Print("Option: ")
 		_, _ = fmt.Scanln(&ops)
+
 		if ops == 1 {
 			show = true
 			showMessage()

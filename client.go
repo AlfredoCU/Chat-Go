@@ -21,15 +21,20 @@ type FileClient struct {
 
 func connectClient() {
 	c, err := net.Dial("tcp", ":9999")
+
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	err = gob.NewEncoder(c).Encode(name)
+
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	go receiveMessageClient(c)
+
 	Menu(c)
 	_ = c.Close()
 }
@@ -46,6 +51,7 @@ func Menu(c net.Conn) {
 		fmt.Print("Option: ")
 		input.Scan()
 		op = input.Text()
+
 		if op == "1" {
 			var msg string
 			fmt.Print("Message: ")
@@ -97,13 +103,13 @@ func receiveMessageClient(c net.Conn) {
 	for {
 		err := gob.NewDecoder(c).Decode(&op)
 		if err != nil {
-			//fmt.Println(err)
+			fmt.Println(err)
 			continue
 		}
 		if op == 1 {
 			err = gob.NewDecoder(c).Decode(&msg)
 			if err != nil {
-				//fmt.Println(err)
+				fmt.Println(err)
 				continue
 			}
 			messageClient.PushBack(msg)

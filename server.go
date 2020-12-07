@@ -1,233 +1,161 @@
 package main
 
+// Import libraries.
 import (
-	"container/list"
 	"encoding/gob"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
+// Data.
+var (
+	clientList []net.Conn
+	chat []string
+)
+
+// Type and Port.
 const (
 	Type = "tcp"
 	Port = ":9999"
 )
 
-var (
-	message list.List
-	client list.List
-	show = true
-)
-
-type File struct {
-	BS []byte
-	Name string
-	UserName string
-}
-
+// Function server.
 func server() {
-	s, err := net.Listen(Type, Port)
+	// Start server.
+	serv, err := net.Listen(Type, Port)
 
+	// Error.
 	if err != nil {
-		fmt.Println(err)
+		fmt.Sprintln(err)
 		return
 	}
 
+	// Accept client or error.
 	for {
-		c, err := s.Accept()
+		// Accept client.
+		con, err := serv.Accept()
 
+		// Error.
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		go handleClient(c)
+		// Added Client in array.
+		clientList = append(clientList, con)
+
+		// Request of client.
+		go handleClient(con)
 	}
 }
 
-func handleClient(c net.Conn) {
-	var op uint64
-	var err error
+/* Function handleClient.
+@param conn net.Conn
+*/
+func handleClient(con net.Conn) {
+	// Message.
+	var message string
 
-	newClient(c)
-
+	// Send Message.
 	for {
-		err = gob.NewDecoder(c).Decode(&op)
+		// Decode Message.
+		err := gob.NewDecoder(con).Decode(&message)
 
+		// Error.
 		if err != nil {
 			fmt.Println(err)
-			continue
-		}
-
-		if op == 1 {
-			receiveMessage(c)
-		} else if op == 2 {
-			receiveFile(c)
-		} else if op == 3 {
-			disconnectClient(c)
-			return
-		} else if op == 0 {
-			newClient(c)
-		}
-	}
-}
-
-func newClient(c net.Conn) {
-	var msg string
-	err := gob.NewDecoder(c).Decode(&msg)
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	client.PushBack(c)
-	msg = "Online: " + msg
-
-	if show {
-		fmt.Println(msg)
-	}
-
-	message.PushBack(msg)
-}
-
-func receiveMessage(c net.Conn) {
-	var msg string
-	err := gob.NewDecoder(c).Decode(&msg)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	if show {
-		fmt.Println(msg)
-	}
-
-	message.PushBack(msg)
-	sendMessageToEveryone(msg, c)
-}
-
-func sendMessageToEveryone(msg string, c net.Conn) {
-	var op uint64 = 1
-
-	for e:=client.Front(); e != nil; e = e.Next() {
-		if e.Value.(net.Conn) != c {
-			err := gob.NewEncoder(e.Value.(net.Conn)).Encode(op)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			err = gob.NewEncoder(e.Value.(net.Conn)).Encode(msg)
-
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-		}
-	}
-}
-
-func receiveFile(c net.Conn) {
-	var f File
-	err := gob.NewDecoder(c).Decode(&f)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// Save File
-	file, err := os.Create(f.Name)
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	defer file.Close()
-	_, _ = file.Write(f.BS)
-
-	msg := f.UserName+": "+f.Name
-	message.PushBack(msg)
-
-	if show {
-		fmt.Println(msg)
-	}
-
-	// Send file to everyone
-	sendFilesAll(c, f)
-}
-
-func sendFilesAll(c net.Conn, f File) {
-	var op uint64 = 2
-	for e:=client.Front(); e != nil; e = e.Next() {
-		if e.Value.(net.Conn) != c {
-			err := gob.NewEncoder(e.Value.(net.Conn)).Encode(op)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			err = gob.NewEncoder(e.Value.(net.Conn)).Encode(f)
-
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-		}
-	}
-}
-
-func showMessage() {
-	for e:=message.Front(); e != nil; e = e.Next() {
-		fmt.Println(e.Value)
-	}
-}
-
-func disconnectClient(c net.Conn) {
-	for e:=client.Front(); e != nil; e = e.Next() {
-		if e.Value.(net.Conn) == c {
-			client.Remove(e)
 			return
 		}
+
+		// Print message.
+		fmt.Println(message)
+
+		// Added message in chat.
+		chat = append(chat, message)
+
+		// Disconnected client.
+		logoutFlag := strings.Contains(message, "It has disconnected")
+
+		// Increment or decrement of clients.
+		if logoutFlag == true {
+			for i := 0; i < len(clientList); i++ {
+				if con == clientList[i] {
+					clientList = append(clientList[:i], clientList[i+1:]...)
+				}
+			}
+		}
+
+		// New Message.
+		for i := 0; i < len(clientList); i++ {
+			if con != clientList[i] {
+				err := gob.NewEncoder(clientList[i]).Encode(message)
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+		}
 	}
 }
 
-func backupMessage() {
-	// Backup to txt file
+// Function saveMessage
+func saveMessage() {
+	// Create file.
 	file, err := os.Create("Backup_Message.txt")
+
+	// Error.
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
+	// Close file.
 	defer file.Close()
 
-	for e:=message.Front(); e != nil; e = e.Next() {
-		_, _ = file.WriteString(e.Value.(string) + "\n")
+	// Added messages in file.
+	for _, message := range chat {
+		_, _ = file.WriteString(message + "\n")
+	}
+
+	// Successfully.
+	fmt.Println("Copy of MESSAGES successfully saved.")
+}
+
+// Function main.
+func main() {
+	// Options.
+	var opc string
+
+	// Start Server.
+	go server()
+
+	// Basic menu.
+	fmt.Println("Start Server...")
+	fmt.Println("1.- Save messages. 2.- Exit server.")
+	fmt.Println("Messages: ")
+
+	for {
+		_, _ = fmt.Scanln(&opc)
+
+		switch opc {
+			case "1":
+				saveMessage()
+			case "2":
+				exited()
+				return
+			default:
+				invalidOptions()
+			}
 	}
 }
 
-func main() {
-	go server()
-	var ops int64
-	for {
-		fmt.Println("MENU")
-		fmt.Println("1.- Show Message")
-		fmt.Println("2.- Save Message")
-		fmt.Println("0.- Exit")
-		fmt.Print("Option: ")
-		_, _ = fmt.Scanln(&ops)
+// Function exited.
+func exited() {
+	fmt.Println("\n-System exited...")
+}
 
-		if ops == 1 {
-			show = true
-			showMessage()
-			_, _ = fmt.Scanln(&ops)
-			show = false
-		} else if ops == 2 {
-			backupMessage()
-		} else if ops == 0 {
-			break
-		} else {
-			fmt.Println("Option invalid!")
-		}
-	}
+// Function invalidOptions.
+func invalidOptions() {
+	fmt.Print("\n-Invalid Option!\n\n")
 }

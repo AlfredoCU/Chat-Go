@@ -1,204 +1,145 @@
 package main
 
+// Import libraries.
 import (
 	"bufio"
-	"container/list"
 	"encoding/gob"
 	"fmt"
 	"net"
 	"os"
 )
 
-var name string
-var messageClient list.List
-var showClient = false
-
-type FileClient struct {
-	BS []byte
-	Name string
-	UserName string
+// User struct.
+type User struct {
+	Name  string
+	Message string
 }
 
-func connectClient() {
-	c, err := net.Dial("tcp", ":9999")
+// Type and Port.
+const (
+	TypeConn = "tcp"
+	PortConn = ":9999"
+)
 
+// Login and message chan.
+var login = make(chan string)
+var messageClient = make(chan User)
+
+/* Function client.
+@param login chan string
+@param messageClient chan User
+*/
+func client(login chan string, messageClient chan User) {
+	// Received Message.
+	var receivedMessage string
+
+	// Connection to server.
+	con, err := net.Dial(TypeConn, PortConn)
+
+	// Error.
 	if err != nil {
-		fmt.Println(err)
+		fmt.Sprintln(err)
 		return
 	}
 
-	err = gob.NewEncoder(c).Encode(name)
+	// Close connection.
+	defer con.Close()
 
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	go receiveMessageClient(c)
-
-	Menu(c)
-	_ = c.Close()
-}
-
-func Menu(c net.Conn) {
-	var op string
-	input := bufio.NewScanner(os.Stdin)
+	// Login, send and received messages.
 	for {
-		fmt.Println("MENU")
-		fmt.Println("1.- Send Message")
-		fmt.Println("2.- Send File")
-		fmt.Println("3.- Show Message")
-		fmt.Println("0.- Exit")
-		fmt.Print("Option: ")
-		input.Scan()
-		op = input.Text()
+		// Actions.
+		select {
+			// Login to server
+			case loginMessage := <-login:
+				err = gob.NewEncoder(con).Encode(loginMessage)
+				if err != nil {
+					fmt.Sprintln(err)
+					return
+				}
 
-		if op == "1" {
-			var msg string
-			fmt.Print("Message: ")
-			input.Scan()
-			msg = input.Text()
-			var submenu uint64 = 1
-			err := gob.NewEncoder(c).Encode(submenu)
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				messageClient.PushBack("Tú: "+msg)
-				msg := name + ": " + msg
-				_ = gob.NewEncoder(c).Encode(msg)
-			}
-		} else if op == "2" {
-			var msg string
-			fmt.Print("Ruta: ")
-			input.Scan()
-			msg = input.Text()
-			sendFileClient(c, msg)
-		} else if op == "3" {
-			showClient = true
-			showMessageClient()
-			input.Scan()
-			showClient = false
-		} else if op == "0" {
-			var submenu uint64 = 3
-			err := gob.NewEncoder(c).Encode(submenu)
-			if err != nil {
-				fmt.Println(err)
-			}
-			break
-		} else {
-			fmt.Println("Option invalid!")
+			// Send message.
+			case newMessage := <-messageClient:
+				chatMessage := newMessage.Name + ": " + newMessage.Message
+				err = gob.NewEncoder(con).Encode(chatMessage)
+				if err != nil {
+					fmt.Sprintln(err)
+					return
+				}
 		}
-	}
-}
 
-func showMessageClient() {
-	fmt.Println()
-	for e:=messageClient.Front(); e != nil; e = e.Next() {
-		fmt.Println(e.Value)
-	}
-}
+		// Decode received messages.
+		err := gob.NewDecoder(con).Decode(&receivedMessage)
 
-func receiveMessageClient(c net.Conn) {
-	var op uint64
-	var msg string
-	for {
-		err := gob.NewDecoder(c).Decode(&op)
+		// Error.
 		if err != nil {
 			fmt.Println(err)
-			continue
+			return
 		}
-		if op == 1 {
-			err = gob.NewDecoder(c).Decode(&msg)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-			messageClient.PushBack(msg)
-			if showClient {
-				fmt.Println(msg)
-			} else {
-				showMessageClient()
-			}
-		} else if op == 2 {
-			receiveFileClient(c)
-		}
+
+		// Print Message.
+		fmt.Println(receivedMessage)
 	}
 }
 
-func sendFileClient(c net.Conn, route string) {
-	file, err := os.Open(route)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer file.Close()
-
-	// To see the status of the file (size, etc)
-	stat, err := file.Stat()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	total := stat.Size() // content size
-	bs := make([]byte, total) // Slice de bytes
-	count, err := file.Read(bs)
-	if err != nil{
-		fmt.Println(err,count)
-		return
-	}
-	// Send slice de bytes
-	nameFile := file.Name()
-
-	var submenu uint64 = 2
-	err = gob.NewEncoder(c).Encode(submenu)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	f := FileClient{BS: bs, Name: nameFile, UserName: name}
-	stopSendFile(c, f)
-}
-
-func stopSendFile(c net.Conn, f FileClient) {
-	err := gob.NewEncoder(c).Encode(&f)
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		messageClient.PushBack("Tú: "+f.Name)
-	}
-}
-
-// Here it is redirected when the flag indicates file
-func receiveFileClient(c net.Conn) {
-	var f FileClient
-	err := gob.NewDecoder(c).Decode(&f)
-	if err != nil {
-		//fmt.Println(err)
-		return
-	}
-	// Save file
-	file, err := os.Create(f.Name)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer file.Close()
-	_, _ = file.Write(f.BS)
-
-	// Save message
-	msg := f.UserName + ": " +f.Name
-	messageClient.PushBack(msg)
-	if showClient {
-		fmt.Println(msg)
-	} else {
-		showMessageClient()
-	}
-}
-
+// Function main.
 func main() {
+	// Variables opc and newUser.
+	var opc string
+	var newUser User
+
+	// UserName.
 	input := bufio.NewScanner(os.Stdin)
-	fmt.Print("Name: ")
+
+	// Start connection.
+	go client(login, messageClient)
+
+	// Print userName.
+	fmt.Print("Username: ")
 	input.Scan()
-	name = input.Text()
-	connectClient()
+	nameUser := input.Text()
+
+	// Added in User struct
+	newUser.Name = nameUser
+
+	// Connect userName.
+	login <- "Has connected: " + nameUser
+
+	// Menu.
+	fmt.Println("----------MENU----------")
+	fmt.Println("1.- Send Message")
+	fmt.Println("2.- Send File")
+	fmt.Println("3.- Exit System")
+
+	for {
+		// Added options.
+		fmt.Print("Option: ")
+		_, _ = fmt.Scanln(&opc)
+
+		// Options.
+		switch opc {
+			// Send messages.
+			case "1":
+				input.Scan()
+				msg := input.Text()
+				newUser.Message = msg
+				messageClient <- newUser
+			// Send files.
+			case "2":
+				fmt.Println("Not implemented!")
+			// Disconnected.
+			case "3":
+				login <- "It has disconnected: " + nameUser
+				var exit string
+				_, _ = fmt.Scanln(&exit)
+				return
+			// Default.
+			default:
+				invalidOptionsClient()
+		}
+	}
+}
+
+// Function invalidOptionsClient.
+func invalidOptionsClient() {
+	fmt.Print("\n-Invalid Option!\n\n")
 }

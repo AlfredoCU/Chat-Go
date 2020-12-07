@@ -28,7 +28,7 @@ func server() {
 
 	// Error.
 	if err != nil {
-		fmt.Sprintln(err)
+		fmt.Sprintln("Error: ", err)
 		return
 	}
 
@@ -37,9 +37,9 @@ func server() {
 		// Accept client.
 		con, err := serv.Accept()
 
-		// Error.
+		// `Error`.
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error: ", err)
 			continue
 		}
 
@@ -65,7 +65,7 @@ func handleClient(con net.Conn) {
 
 		// Error.
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error: ", err)
 			return
 		}
 
@@ -106,7 +106,7 @@ func saveMessage() {
 
 	// Error.
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error: ", err)
 		return
 	}
 
@@ -136,14 +136,18 @@ func main() {
 	fmt.Println("Messages: ")
 
 	for {
+		// Option.
 		_, _ = fmt.Scanln(&opc)
 
 		switch opc {
+			// Save all chat.
 			case "1":
 				saveMessage()
+			// Exit.
 			case "2":
 				exited()
 				return
+			// Default.
 			default:
 				invalidOptions()
 			}

@@ -38,7 +38,7 @@ func client(login chan string, messageClient chan User) {
 
 	// Error.
 	if err != nil {
-		fmt.Sprintln(err)
+		fmt.Sprintln("Error: ", err)
 		return
 	}
 
@@ -72,7 +72,7 @@ func client(login chan string, messageClient chan User) {
 
 		// Error.
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error: ", err)
 			return
 		}
 

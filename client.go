@@ -109,10 +109,11 @@ func main() {
 	fmt.Println("1.- Send Message")
 	fmt.Println("2.- Send File")
 	fmt.Println("3.- Exit System")
+	fmt.Println("Option: ")
 
 	for {
 		// Added options.
-		fmt.Print("Option: ")
+		//fmt.Println("Option: ")
 		_, _ = fmt.Scanln(&opc)
 
 		// Options.

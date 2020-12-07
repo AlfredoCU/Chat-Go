@@ -1,0 +1,9 @@
+Has connected: Alfredo
+Has connected: Victor
+Alfredo: Hola victor, como estas?
+Victor: Hola Alfredo muy bien y tu?
+Alfredo: Muy bien gracias y que haces?
+Victor: Estoy estudiando y tu?
+Alfredo: Estoy trabajando un rato desde casa, jajajaj.
+Victor: Genial bro, bueno te dejo porque tengo que ir a comer.
+Alfredo: Muy bien va, hasta luego.
